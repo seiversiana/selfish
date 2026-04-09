@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -10,27 +10,49 @@ use directories::ProjectDirs;
 
 
 
-fn dirs() -> ProjectDirs
+enum Error
 {
-	return ProjectDirs::from("com", "seiversiana", "selfish").expect("Could not retrieve directories");
+	ProjectDirsUnavailable,
+	DataDirCreateFail(PathBuf)
 }
 
-fn data_dir() -> PathBuf
+impl Error
 {
-	return dirs().data_local_dir().to_path_buf();
-}
-
-fn init()
-{
-	if data_dir().exists()
+	fn message(&self) -> String
 	{
-		println!("{}", "selfish is already initialized!".red());
-		return;
+		match self
+		{
+			Self::ProjectDirsUnavailable =>
+				"Could not retrieve project dirs.".to_string(),
+			Self::DataDirCreateFail(path) =>
+				format!("Could not create data dir at {}", path.display())
+		}
+	}
+}
+
+
+
+fn dirs() -> Result<ProjectDirs, Error>
+{
+	ProjectDirs::from("com", "seiversiana", "selfish")
+		.ok_or(Error::ProjectDirsUnavailable)
+}
+
+fn init(path: &Path) -> Result<(), Error>
+{
+	if path.exists()
+	{
+		println!("{}", "selfish is already initialized!".yellow());
+	}
+	else
+	{
+		fs::create_dir_all(path)
+			.map_err(|_| Error::DataDirCreateFail(path.to_path_buf()))?;
+
+		println!("{}", "Successfully initialized selfish.".green());
 	}
 
-	fs::create_dir_all(data_dir()).expect("Could not create store");
-
-	println!("{}", "Successfully initialized selfish.".green());
+	Ok(())
 }
 
 
@@ -51,12 +73,20 @@ enum Commands
 
 
 
-fn main()
+fn run() -> Result<(), Error>
 {
 	let selfish = Selfish::parse();
 
 	match &selfish.command
 	{
-		Commands::Init => init()
+		Commands::Init => init(dirs()?.config_local_dir())
+	}
+}
+
+fn main()
+{
+	if let Err(error) = run()
+	{
+		println!("{}", error.message().red())
 	}
 }
