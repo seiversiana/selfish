@@ -69,6 +69,11 @@ impl DataTree
 		Ok(DataTree { dirs })
 	}
 
+	fn initialized(&self) -> bool
+	{
+		self.root().exists() && self.todo_path().exists()
+	}
+
 	fn root(&self) -> PathBuf
 	{
 		self.dirs.data_local_dir().to_path_buf()
@@ -84,14 +89,14 @@ impl DataTree
 
 fn init(tree: &DataTree) -> Result<(), Error>
 {
-	let root = tree.root();
-	let todo_path = tree.todo_path();
-
-	if root.exists()
+	if tree.initialized()
 	{
 		println!("{}", "selfish is already initialized!".yellow());
 		return Ok(());
 	}
+
+	let root = tree.root();
+	let todo_path = tree.todo_path();
 
 	fs::create_dir_all(&root)
 		.map_err(|_| Error::DirCreateFail(root))?;
@@ -133,7 +138,7 @@ fn write_todo(tree: &DataTree, todos: HashMap<String, ()>) -> Result<(), Error>
 
 fn todo_add(tree: &DataTree, name: String) -> Result<(), Error>
 {
-	if !tree.root().exists()
+	if !tree.initialized()
 	{
 		println!("{}", "selfish is not yet initialized!".yellow());
 		return Ok(());
