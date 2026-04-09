@@ -109,6 +109,43 @@ fn init(tree: &DataTree) -> Result<(), Error>
 	Ok(())
 }
 
+fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
+{
+	if !tree.initialized()
+	{
+		println!("{}", "selfish is not yet initialized!".yellow());
+		return Ok(());
+	}
+
+	let mut todos = read_todo(tree)?;
+
+	match command
+	{
+		TodoCommands::Add { name } =>
+		{
+			if todos.contains_key(&name)
+			{
+				println!("{}", "A todo of that name already exists!".yellow());
+				return Ok(());
+			}
+
+			todos.insert(name, ());
+			write_todo(tree, todos)?;
+			println!("{}", "Added todo item.".green());
+		},
+
+		TodoCommands::List =>
+		{
+			for (name, _) in todos
+			{
+				println!("{}", name);
+			}
+		}
+	}
+
+	Ok(())
+}
+
 
 
 fn read_todo(tree: &DataTree) -> Result<HashMap<String, ()>, Error>
@@ -161,43 +198,6 @@ enum TodoCommands
 }
 
 
-
-fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
-{
-	if !tree.initialized()
-	{
-		println!("{}", "selfish is not yet initialized!".yellow());
-		return Ok(());
-	}
-
-	let mut todos = read_todo(tree)?;
-
-	match command
-	{
-		TodoCommands::Add { name } =>
-		{
-			if todos.contains_key(&name)
-			{
-				println!("{}", "A todo of that name already exists!".yellow());
-				return Ok(());
-			}
-
-			todos.insert(name, ());
-			write_todo(tree, todos)?;
-			println!("{}", "Added todo item.".green());
-		},
-
-		TodoCommands::List =>
-		{
-			for (name, _) in todos
-			{
-				println!("{}", name);
-			}
-		}
-	}
-
-	Ok(())
-}
 
 fn run() -> Result<(), Error>
 {
