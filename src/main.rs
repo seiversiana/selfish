@@ -10,14 +10,14 @@ use directories::ProjectDirs;
 
 
 
-fn selfish_dirs() -> ProjectDirs
+fn dirs() -> ProjectDirs
 {
 	return ProjectDirs::from("com", "seiversiana", "selfish").expect("Could not retrieve directories");
 }
 
 fn data_dir() -> PathBuf
 {
-	return selfish_dirs().data_local_dir().to_path_buf();
+	return dirs().data_local_dir().to_path_buf();
 }
 
 fn init()
