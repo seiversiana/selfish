@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) Nile Jocson <seiversiana@gmail.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,8 +14,12 @@ use directories::ProjectDirs;
 enum Error
 {
 	ProjectDirsUnavailable,
-	DataDirCreateFail(PathBuf),
-	TodoFileCreateFail(PathBuf),
+	DirCreateFail(PathBuf),
+	FileCreateFail(PathBuf),
+	FileReadFail(PathBuf),
+	FileWriteFail(PathBuf),
+	DeserializeFail(PathBuf),
+	SerializeFail(PathBuf)
 }
 
 impl Error
@@ -24,11 +29,19 @@ impl Error
 		match self
 		{
 			Self::ProjectDirsUnavailable =>
-				"Could not retrieve project dirs.".to_string(),
-			Self::DataDirCreateFail(path) =>
-				format!("Could not create data dir at {}.", path.display()),
-			Self::TodoFileCreateFail(path) =>
-				format!("Could not create todo file at {}.", path.display())
+				"Failed to retrieve project dirs.".to_string(),
+			Self::DirCreateFail(path) =>
+				format!("Failed to create dir at {}.", path.display()),
+			Self::FileCreateFail(path) =>
+				format!("Failed to create file at {}.", path.display()),
+			Self::FileReadFail(path) =>
+				format!("Failed to read file at {}.", path.display()),
+			Self::FileWriteFail(path) =>
+				format!("Failed to write file at {}.", path.display()),
+			Self::DeserializeFail(path) =>
+				format!("Failed to deserialize {}.", path.display()),
+			Self::SerializeFail(path) =>
+				format!("Failed to serialize {}.", path.display())
 		}
 	}
 }
@@ -46,18 +59,50 @@ fn init(path: &Path) -> Result<(), Error>
 	if path.exists()
 	{
 		println!("{}", "selfish is already initialized!".yellow());
+		return Ok(());
 	}
-	else
+
+	fs::create_dir_all(&path)
+		.map_err(|_| Error::DirCreateFail(path.to_path_buf()))?;
+
+	let todo_path = path.join("todo.json");
+	fs::write(&todo_path, b"{}")
+		.map_err(|_| Error::FileCreateFail(todo_path))?;
+
+	println!("{}", "Successfully initialized selfish.".green());
+
+	Ok(())
+}
+
+fn todo_add(path: &Path, name: String) -> Result<(), Error>
+{
+	if !path.exists()
 	{
-		fs::create_dir_all(&path)
-			.map_err(|_| Error::DataDirCreateFail(path.to_path_buf()))?;
-
-		let todo_file = path.join("todo.json");
-		fs::write(&todo_file, b"[]")
-			.map_err(|_| Error::TodoFileCreateFail(todo_file))?;
-
-		println!("{}", "Successfully initialized selfish.".green());
+		println!("{}", "selfish is not yet initialized!".yellow());
+		return Ok(());
 	}
+
+	let todo_path = path.join("todo.json");
+	let data = fs::read_to_string(&todo_path)
+		.map_err(|_| Error::FileReadFail(todo_path.clone()))?
+		.to_string();
+	let mut todos: HashMap<String, ()> = serde_json::from_str(&data)
+		.map_err(|_| Error::DeserializeFail(todo_path.clone()))?;
+
+	if todos.contains_key(&name)
+	{
+		println!("{}", "A todo of that name already exists!".yellow());
+		return Ok(());
+	}
+
+	todos.insert(name, ());
+
+	let data = serde_json::to_string_pretty(&todos)
+		.map_err(|_| Error::SerializeFail(todo_path.clone()))?;
+	fs::write(&todo_path, data)
+		.map_err(|_| Error::FileWriteFail(todo_path))?;
+
+	println!("{}", "Added todo item.".green());
 
 	Ok(())
 }
@@ -87,22 +132,24 @@ enum TodoCommands
 
 
 
-fn todo(command: TodoCommands) -> Result<(), Error>
+fn todo(path: &Path, command: TodoCommands) -> Result<(), Error>
 {
 	match command
 	{
-		TodoCommands::Add { name } => todo!()
+		TodoCommands::Add { name } => todo_add(path, name)
 	}
 }
 
 fn run() -> Result<(), Error>
 {
 	let selfish = Selfish::parse();
+	let dirs = dirs()?;
+	let data_dir = dirs.data_local_dir();
 
 	match selfish.command
 	{
-		Commands::Init => init(dirs()?.data_local_dir()),
-		Commands::Todo { command } => todo(command)
+		Commands::Init => init(data_dir),
+		Commands::Todo { command } => todo(data_dir, command)
 	}
 }
 
