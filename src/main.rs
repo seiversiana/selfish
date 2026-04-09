@@ -159,6 +159,24 @@ fn todo_add(tree: &DataTree, name: String) -> Result<(), Error>
 	Ok(())
 }
 
+fn todo_list(tree: &DataTree) -> Result<(), Error>
+{
+	if !tree.initialized()
+	{
+		println!("{}", "selfish is not yet initialized!".yellow());
+		return Ok(());
+	}
+
+	let todos = read_todo(tree)?;
+
+	for (name, _) in todos
+	{
+		println!("{}", name);
+	}
+
+	Ok(())
+}
+
 
 
 #[derive(Parser)]
@@ -179,7 +197,8 @@ enum Commands
 #[derive(Subcommand)]
 enum TodoCommands
 {
-	Add { name: String }
+	Add { name: String },
+	List
 }
 
 
@@ -188,7 +207,8 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 {
 	match command
 	{
-		TodoCommands::Add { name } => todo_add(tree, name)
+		TodoCommands::Add { name } => todo_add(tree, name),
+		TodoCommands::List => todo_list(tree)
 	}
 }
 
