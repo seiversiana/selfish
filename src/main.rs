@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -48,24 +48,48 @@ impl Error
 
 
 
-fn dirs() -> Result<ProjectDirs, Error>
+struct DataTree
 {
-	ProjectDirs::from("com", "seiversiana", "selfish")
-		.ok_or(Error::ProjectDirsUnavailable)
+	dirs: ProjectDirs
 }
 
-fn init(path: &Path) -> Result<(), Error>
+impl DataTree
 {
-	if path.exists()
+	fn from_default() -> Result<Self, Error>
+	{
+		let dirs = ProjectDirs::from("com", "seiversiana", "selfish")
+			.ok_or(Error::ProjectDirsUnavailable)?;
+
+		Ok(DataTree { dirs })
+	}
+
+	fn root(&self) -> PathBuf
+	{
+		self.dirs.data_local_dir().to_path_buf()
+	}
+
+	fn todo_path(&self) -> PathBuf
+	{
+		self.root().join("todo.json")
+	}
+}
+
+
+
+fn init(tree: &DataTree) -> Result<(), Error>
+{
+	let root = tree.root();
+	let todo_path = tree.todo_path();
+
+	if root.exists()
 	{
 		println!("{}", "selfish is already initialized!".yellow());
 		return Ok(());
 	}
 
-	fs::create_dir_all(&path)
-		.map_err(|_| Error::DirCreateFail(path.to_path_buf()))?;
+	fs::create_dir_all(&root)
+		.map_err(|_| Error::DirCreateFail(root))?;
 
-	let todo_path = path.join("todo.json");
 	fs::write(&todo_path, b"{}")
 		.map_err(|_| Error::FileCreateFail(todo_path))?;
 
@@ -76,9 +100,9 @@ fn init(path: &Path) -> Result<(), Error>
 
 
 
-fn read_todo(path: &Path) -> Result<HashMap<String, ()>, Error>
+fn read_todo(tree: &DataTree) -> Result<HashMap<String, ()>, Error>
 {
-	let todo_path = path.join("todo.json");
+	let todo_path = tree.todo_path();
 
 	let data = fs::read_to_string(&todo_path)
 		.map_err(|_| Error::FileReadFail(todo_path.clone()))?
@@ -88,9 +112,9 @@ fn read_todo(path: &Path) -> Result<HashMap<String, ()>, Error>
 		.map_err(|_| Error::DeserializeFail(todo_path))?)
 }
 
-fn write_todo(path: &Path, todos: HashMap<String, ()>) -> Result<(), Error>
+fn write_todo(tree: &DataTree, todos: HashMap<String, ()>) -> Result<(), Error>
 {
-	let todo_path = path.join("todo.json");
+	let todo_path = tree.todo_path();
 
 	let data = serde_json::to_string_pretty(&todos)
 		.map_err(|_| Error::SerializeFail(todo_path.clone()))?;
@@ -101,15 +125,15 @@ fn write_todo(path: &Path, todos: HashMap<String, ()>) -> Result<(), Error>
 	Ok(())
 }
 
-fn todo_add(path: &Path, name: String) -> Result<(), Error>
+fn todo_add(tree: &DataTree, name: String) -> Result<(), Error>
 {
-	if !path.exists()
+	if !tree.root().exists()
 	{
 		println!("{}", "selfish is not yet initialized!".yellow());
 		return Ok(());
 	}
 
-	let mut todos = read_todo(path)?;
+	let mut todos = read_todo(tree)?;
 
 	if todos.contains_key(&name)
 	{
@@ -118,8 +142,9 @@ fn todo_add(path: &Path, name: String) -> Result<(), Error>
 	}
 
 	todos.insert(name, ());
-	write_todo(path, todos)?;
+	write_todo(tree, todos)?;
 	println!("{}", "Added todo item.".green());
+
 	Ok(())
 }
 
@@ -148,24 +173,23 @@ enum TodoCommands
 
 
 
-fn todo(path: &Path, command: TodoCommands) -> Result<(), Error>
+fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 {
 	match command
 	{
-		TodoCommands::Add { name } => todo_add(path, name)
+		TodoCommands::Add { name } => todo_add(tree, name)
 	}
 }
 
 fn run() -> Result<(), Error>
 {
 	let selfish = Selfish::parse();
-	let dirs = dirs()?;
-	let data_dir = dirs.data_local_dir();
+	let data_tree = DataTree::from_default()?;
 
 	match selfish.command
 	{
-		Commands::Init => init(data_dir),
-		Commands::Todo { command } => todo(data_dir, command)
+		Commands::Init => init(&data_tree),
+		Commands::Todo { command } => todo(&data_tree, command)
 	}
 }
 
