@@ -13,7 +13,8 @@ use directories::ProjectDirs;
 enum Error
 {
 	ProjectDirsUnavailable,
-	DataDirCreateFail(PathBuf)
+	DataDirCreateFail(PathBuf),
+	TodoFileCreateFail(PathBuf),
 }
 
 impl Error
@@ -25,7 +26,9 @@ impl Error
 			Self::ProjectDirsUnavailable =>
 				"Could not retrieve project dirs.".to_string(),
 			Self::DataDirCreateFail(path) =>
-				format!("Could not create data dir at {}.", path.display())
+				format!("Could not create data dir at {}.", path.display()),
+			Self::TodoFileCreateFail(path) =>
+				format!("Could not create todo file at {}.", path.display())
 		}
 	}
 }
@@ -46,8 +49,12 @@ fn init(path: &Path) -> Result<(), Error>
 	}
 	else
 	{
-		fs::create_dir_all(path)
+		fs::create_dir_all(&path)
 			.map_err(|_| Error::DataDirCreateFail(path.to_path_buf()))?;
+
+		let todo_file = path.join("todo.json");
+		fs::write(&todo_file, b"[]")
+			.map_err(|_| Error::TodoFileCreateFail(todo_file))?;
 
 		println!("{}", "Successfully initialized selfish.".green());
 	}
@@ -94,7 +101,7 @@ fn run() -> Result<(), Error>
 
 	match selfish.command
 	{
-		Commands::Init => init(dirs()?.config_local_dir()),
+		Commands::Init => init(dirs()?.data_local_dir()),
 		Commands::Todo { command } => todo(command)
 	}
 }
