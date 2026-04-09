@@ -25,7 +25,7 @@ impl Error
 			Self::ProjectDirsUnavailable =>
 				"Could not retrieve project dirs.".to_string(),
 			Self::DataDirCreateFail(path) =>
-				format!("Could not create data dir at {}", path.display())
+				format!("Could not create data dir at {}.", path.display())
 		}
 	}
 }
