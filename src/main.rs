@@ -74,6 +74,33 @@ fn init(path: &Path) -> Result<(), Error>
 	Ok(())
 }
 
+
+
+fn read_todo(path: &Path) -> Result<HashMap<String, ()>, Error>
+{
+	let todo_path = path.join("todo.json");
+
+	let data = fs::read_to_string(&todo_path)
+		.map_err(|_| Error::FileReadFail(todo_path.clone()))?
+		.to_string();
+
+	Ok(serde_json::from_str::<HashMap<String, ()>>(&data)
+		.map_err(|_| Error::DeserializeFail(todo_path))?)
+}
+
+fn write_todo(path: &Path, todos: HashMap<String, ()>) -> Result<(), Error>
+{
+	let todo_path = path.join("todo.json");
+
+	let data = serde_json::to_string_pretty(&todos)
+		.map_err(|_| Error::SerializeFail(todo_path.clone()))?;
+
+	fs::write(&todo_path, data)
+		.map_err(|_| Error::FileWriteFail(todo_path))?;
+
+	Ok(())
+}
+
 fn todo_add(path: &Path, name: String) -> Result<(), Error>
 {
 	if !path.exists()
@@ -82,12 +109,7 @@ fn todo_add(path: &Path, name: String) -> Result<(), Error>
 		return Ok(());
 	}
 
-	let todo_path = path.join("todo.json");
-	let data = fs::read_to_string(&todo_path)
-		.map_err(|_| Error::FileReadFail(todo_path.clone()))?
-		.to_string();
-	let mut todos: HashMap<String, ()> = serde_json::from_str(&data)
-		.map_err(|_| Error::DeserializeFail(todo_path.clone()))?;
+	let mut todos = read_todo(path)?;
 
 	if todos.contains_key(&name)
 	{
@@ -96,14 +118,8 @@ fn todo_add(path: &Path, name: String) -> Result<(), Error>
 	}
 
 	todos.insert(name, ());
-
-	let data = serde_json::to_string_pretty(&todos)
-		.map_err(|_| Error::SerializeFail(todo_path.clone()))?;
-	fs::write(&todo_path, data)
-		.map_err(|_| Error::FileWriteFail(todo_path))?;
-
+	write_todo(path, todos)?;
 	println!("{}", "Added todo item.".green());
-
 	Ok(())
 }
 
