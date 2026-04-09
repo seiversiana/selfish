@@ -30,16 +30,22 @@ impl Error
 		{
 			Self::ProjectDirsUnavailable =>
 				"Failed to retrieve project dirs.".to_string(),
+
 			Self::DirCreateFail(path) =>
 				format!("Failed to create dir at {}.", path.display()),
+
 			Self::FileCreateFail(path) =>
 				format!("Failed to create file at {}.", path.display()),
+
 			Self::FileReadFail(path) =>
 				format!("Failed to read file at {}.", path.display()),
+
 			Self::FileWriteFail(path) =>
 				format!("Failed to write file at {}.", path.display()),
+
 			Self::DeserializeFail(path) =>
 				format!("Failed to deserialize {}.", path.display()),
+
 			Self::SerializeFail(path) =>
 				format!("Failed to serialize {}.", path.display())
 		}
