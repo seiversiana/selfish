@@ -68,18 +68,34 @@ struct Selfish
 #[derive(Subcommand)]
 enum Commands
 {
-	Init
+	Init,
+	Todo { #[command(subcommand)] command: TodoCommands }
+}
+
+#[derive(Subcommand)]
+enum TodoCommands
+{
+	Add { name: String }
 }
 
 
+
+fn todo(command: TodoCommands) -> Result<(), Error>
+{
+	match command
+	{
+		TodoCommands::Add { name } => todo!()
+	}
+}
 
 fn run() -> Result<(), Error>
 {
 	let selfish = Selfish::parse();
 
-	match &selfish.command
+	match selfish.command
 	{
-		Commands::Init => init(dirs()?.config_local_dir())
+		Commands::Init => init(dirs()?.config_local_dir()),
+		Commands::Todo { command } => todo(command)
 	}
 }
 
