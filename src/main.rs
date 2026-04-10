@@ -14,6 +14,7 @@ use directories::ProjectDirs;
 enum Error
 {
 	ProjectDirsUnavailable,
+	BadDataTree(PathBuf),
 	DirCreateFail(PathBuf),
 	FileCreateFail(PathBuf),
 	FileReadFail(PathBuf),
@@ -30,6 +31,9 @@ impl Error
 		{
 			Self::ProjectDirsUnavailable =>
 				"Failed to retrieve project dirs.".to_string(),
+
+			Self::BadDataTree(path) =>
+				format!("Bad data tree at {}.", path.display()),
 
 			Self::DirCreateFail(path) =>
 				format!("Failed to create dir at {}.", path.display()),
@@ -69,9 +73,23 @@ impl DataTree
 		Ok(DataTree { dirs })
 	}
 
-	fn initialized(&self) -> bool
+	fn initialized(&self) -> Result<bool, Error>
 	{
-		self.root().exists() && self.todo_path().exists()
+		let existences =
+		[
+			self.root().exists(),
+			self.todo_path().exists()
+		];
+
+		let first = existences[0];
+		if existences.iter().all(|&v| v == first)
+		{
+			Ok(first)
+		}
+		else
+		{
+			Err(Error::BadDataTree(self.root()))
+		}
 	}
 
 	fn root(&self) -> PathBuf
@@ -89,20 +107,35 @@ impl DataTree
 
 fn init(tree: &DataTree) -> Result<(), Error>
 {
-	if tree.initialized()
+	let initialized = tree.initialized();
+
+	match initialized
 	{
-		println!("{}", "selfish is already initialized!".yellow());
-		return Ok(());
+		Ok(true) =>
+		{
+			println!("{}", "selfish is already initialized!".yellow());
+			return Ok(());
+		}
+
+		Err(_) =>
+		{
+			println!("{}", "selfish data dir already exists but is incomplete. Creating the missing files.".yellow());
+		}
+
+		_ =>
+		{
+			let root = tree.root();
+			fs::create_dir_all(&root).map_err(|_| Error::DirCreateFail(root))?;
+		}
 	}
 
-	let root = tree.root();
 	let todo_path = tree.todo_path();
 
-	fs::create_dir_all(&root)
-		.map_err(|_| Error::DirCreateFail(root))?;
-
-	fs::write(&todo_path, b"{}")
-		.map_err(|_| Error::FileCreateFail(todo_path))?;
+	if !todo_path.exists()
+	{
+		fs::write(&todo_path, b"{}")
+			.map_err(|_| Error::FileCreateFail(todo_path))?;
+	}
 
 	println!("{}", "Successfully initialized selfish.".green());
 
@@ -111,7 +144,7 @@ fn init(tree: &DataTree) -> Result<(), Error>
 
 fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 {
-	if !tree.initialized()
+	if !tree.initialized()?
 	{
 		println!("{}", "selfish is not yet initialized!".yellow());
 		return Ok(());
@@ -132,7 +165,7 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 			todos.insert(name, ());
 			write_todo(tree, todos)?;
 			println!("{}", "Added todo item.".green());
-		},
+		}
 
 		TodoCommands::List =>
 		{
