@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use std::collections::HashMap;
+
 use std::fs;
-use std::path::PathBuf;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -101,9 +103,38 @@ impl DataTree
 	{
 		self.root().join("todo.json")
 	}
+
+	fn schedule_path(&self) -> PathBuf
+	{
+		self.root().join("schedule.json")
+	}
 }
 
 
+
+fn create_if_missing(path: &Path, content: &str) -> Result<(), Error>
+{
+	let mut file = match fs::OpenOptions::new()
+		.write(true)
+		.create_new(true)
+		.open(path)
+	{
+		Ok(file) => file,
+		Err(error) if error.kind() == io::ErrorKind::AlreadyExists =>
+		{
+			return Ok(());
+		}
+		Err(_) =>
+		{
+			return Err(Error::FileCreateFail(path.to_path_buf()));
+		}
+	};
+
+	file.write_all(content.as_bytes())
+		.map_err(|_| Error::FileWriteFail(path.to_path_buf()))?;
+
+	Ok(())
+}
 
 fn init(tree: &DataTree) -> Result<(), Error>
 {
@@ -129,13 +160,9 @@ fn init(tree: &DataTree) -> Result<(), Error>
 		}
 	}
 
-	let todo_path = tree.todo_path();
-
-	if !todo_path.exists()
-	{
-		fs::write(&todo_path, b"{}")
-			.map_err(|_| Error::FileCreateFail(todo_path))?;
-	}
+	let content = "{}";
+	create_if_missing(&tree.todo_path(), &content)?;
+	create_if_missing(&tree.schedule_path(), &content)?;
 
 	println!("{}", "Successfully initialized selfish.".green());
 
@@ -186,8 +213,7 @@ fn read_todo(tree: &DataTree) -> Result<HashMap<String, ()>, Error>
 	let todo_path = tree.todo_path();
 
 	let data = fs::read_to_string(&todo_path)
-		.map_err(|_| Error::FileReadFail(todo_path.clone()))?
-		.to_string();
+		.map_err(|_| Error::FileReadFail(todo_path.clone()))?;
 
 	Ok(serde_json::from_str::<HashMap<String, ()>>(&data)
 		.map_err(|_| Error::DeserializeFail(todo_path))?)
