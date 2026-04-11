@@ -15,7 +15,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 
 
-enum Error
+enum FatalError
 {
 	ProjectDirsUnavailable,
 	BadDataTree(PathBuf),
@@ -27,7 +27,7 @@ enum Error
 	SerializeFail(PathBuf)
 }
 
-impl Error
+impl FatalError
 {
 	fn message(&self) -> String
 	{
@@ -37,27 +37,58 @@ impl Error
 				"Failed to retrieve project dirs.".to_string(),
 
 			Self::BadDataTree(path) =>
-				format!("Bad data tree at {}.", path.display()),
+				format!("Data directory '{}' is in an invalid state.", path.display()),
 
 			Self::DirCreateFail(path) =>
-				format!("Failed to create dir at {}.", path.display()),
+				format!("Failed to create directory '{}'.", path.display()),
 
 			Self::FileCreateFail(path) =>
-				format!("Failed to create file at {}.", path.display()),
+				format!("Failed to create file '{}'.", path.display()),
 
 			Self::FileReadFail(path) =>
-				format!("Failed to read file at {}.", path.display()),
+				format!("Failed to read from '{}'.", path.display()),
 
 			Self::FileWriteFail(path) =>
-				format!("Failed to write file at {}.", path.display()),
+				format!("Failed to write to '{}'.", path.display()),
 
 			Self::DeserializeFail(path) =>
-				format!("Failed to deserialize {}.", path.display()),
+				format!("Failed to deserialize from '{}'.", path.display()),
 
 			Self::SerializeFail(path) =>
-				format!("Failed to serialize {}.", path.display())
+				format!("Failed to serialize to '{}'.", path.display())
 		}
 	}
+}
+
+enum Exit
+{
+	NotInitialized,
+	AlreadyInitialized(PathBuf),
+	TodoExists(String)
+}
+
+impl Exit
+{
+	fn message(&self) -> String
+	{
+		match self
+		{
+			Self::NotInitialized =>
+				"selfish is not yet initialized.".to_string(),
+
+			Self::AlreadyInitialized(path) =>
+				format!("selfish is already initialized at {}.", path.display()),
+
+			Self::TodoExists(name) =>
+				format!("A todo named '{}' already exists.", name)
+		}
+	}
+}
+
+enum Outcome
+{
+	FatalError(FatalError),
+	Exit(Exit)
 }
 
 
@@ -69,15 +100,15 @@ struct DataTree
 
 impl DataTree
 {
-	fn from_default() -> Result<Self, Error>
+	fn from_default() -> Result<Self, Outcome>
 	{
 		let dirs = ProjectDirs::from("com", "seiversiana", "selfish")
-			.ok_or(Error::ProjectDirsUnavailable)?;
+			.ok_or(Outcome::FatalError(FatalError::ProjectDirsUnavailable))?;
 
 		Ok(DataTree { dirs })
 	}
 
-	fn initialized(&self) -> Result<bool, Error>
+	fn initialized(&self) -> Result<bool, Outcome>
 	{
 		let existences =
 		[
@@ -92,7 +123,7 @@ impl DataTree
 		}
 		else
 		{
-			Err(Error::BadDataTree(self.root()))
+			Err(Outcome::FatalError(FatalError::BadDataTree(self.root())))
 		}
 	}
 
@@ -126,7 +157,7 @@ type Schedule = Vec<ScheduleItem>;
 
 
 
-fn create_if_missing(path: &Path, content: &str) -> Result<(), Error>
+fn create_if_missing(path: &Path, content: &str) -> Result<(), Outcome>
 {
 	let mut file = match fs::OpenOptions::new()
 		.write(true)
@@ -140,37 +171,33 @@ fn create_if_missing(path: &Path, content: &str) -> Result<(), Error>
 		}
 		Err(_) =>
 		{
-			return Err(Error::FileCreateFail(path.to_path_buf()));
+			return Err(Outcome::FatalError(FatalError::FileCreateFail(path.to_path_buf())));
 		}
 	};
 
 	file.write_all(content.as_bytes())
-		.map_err(|_| Error::FileWriteFail(path.to_path_buf()))?;
-
-	Ok(())
+		.map_err(|_| Outcome::FatalError(FatalError::FileWriteFail(path.to_path_buf())))
 }
 
-fn init(tree: &DataTree) -> Result<(), Error>
+fn init(tree: &DataTree) -> Result<(), Outcome>
 {
 	let initialized = tree.initialized();
 
 	match initialized
 	{
-		Ok(true) =>
-		{
-			println!("{}", "selfish is already initialized!".yellow());
-			return Ok(());
+		Ok(true) => {
+			return Err(Outcome::Exit(Exit::AlreadyInitialized(tree.root().to_path_buf())));
 		}
 
 		Err(_) =>
 		{
-			println!("{}", "selfish data dir already exists but is incomplete. Creating the missing files.".yellow());
+			println!("{}", "selfish data dir already exists but is incomplete. Creating the missing files.".blue());
 		}
 
 		_ =>
 		{
 			let root = tree.root();
-			fs::create_dir_all(&root).map_err(|_| Error::DirCreateFail(root))?;
+			fs::create_dir_all(&root).map_err(|_| Outcome::FatalError(FatalError::DirCreateFail(root)))?;
 		}
 	}
 
@@ -183,12 +210,11 @@ fn init(tree: &DataTree) -> Result<(), Error>
 	Ok(())
 }
 
-fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
+fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Outcome>
 {
 	if !tree.initialized()?
 	{
-		println!("{}", "selfish is not yet initialized!".yellow());
-		return Ok(());
+		return Err(Outcome::Exit(Exit::NotInitialized));
 	}
 
 	let mut todos = read_todo(tree)?;
@@ -199,8 +225,7 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 		{
 			if todos.contains_key(&name)
 			{
-				println!("{}", "A todo of that name already exists!".yellow());
-				return Ok(());
+				return Err(Outcome::Exit(Exit::TodoExists(name)));
 			}
 
 			todos.insert(name, ());
@@ -222,30 +247,30 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 
 
 
-fn read_deserialize<T: DeserializeOwned>(path: &Path) -> Result<T, Error>
+fn read_deserialize<T: DeserializeOwned>(path: &Path) -> Result<T, Outcome>
 {
 	let data = fs::read_to_string(path)
-		.map_err(|_| Error::FileReadFail(path.to_path_buf()))?;
+		.map_err(|_| Outcome::FatalError(FatalError::FileReadFail(path.to_path_buf())))?;
 
 	serde_json::from_str(&data)
-		.map_err(|_| Error::DeserializeFail(path.to_path_buf()))
+		.map_err(|_| Outcome::FatalError(FatalError::DeserializeFail(path.to_path_buf())))
 }
 
-fn write_serialize<T: Serialize>(path: &Path, data: &T) -> Result<(), Error>
+fn write_serialize<T: Serialize>(path: &Path, data: &T) -> Result<(), Outcome>
 {
 	let data = serde_json::to_string_pretty(data)
-		.map_err(|_| Error::SerializeFail(path.to_path_buf()))?;
+		.map_err(|_| Outcome::FatalError(FatalError::SerializeFail(path.to_path_buf())))?;
 
 	fs::write(&path, data)
-		.map_err(|_| Error::FileWriteFail(path.to_path_buf()))
+		.map_err(|_| Outcome::FatalError(FatalError::FileWriteFail(path.to_path_buf())))
 }
 
-fn read_todo(tree: &DataTree) -> Result<Todos, Error>
+fn read_todo(tree: &DataTree) -> Result<Todos, Outcome>
 {
 	read_deserialize(&tree.todo_path())
 }
 
-fn write_todo(tree: &DataTree, todos: &Todos) -> Result<(), Error>
+fn write_todo(tree: &DataTree, todos: &Todos) -> Result<(), Outcome>
 {
 	write_serialize(&tree.todo_path(), todos)
 }
@@ -288,7 +313,7 @@ enum ScheduleCommands
 
 
 
-fn run() -> Result<(), Error>
+fn run() -> Result<(), Outcome>
 {
 	let selfish = Selfish::parse();
 	let data_tree = DataTree::from_default()?;
@@ -303,8 +328,12 @@ fn run() -> Result<(), Error>
 
 fn main()
 {
-	if let Err(error) = run()
+	if let Err(outcome) = run()
 	{
-		println!("{}", error.message().red())
+		match outcome
+		{
+			Outcome::FatalError(kind) => { println!("{}", kind.message().red()); }
+			Outcome::Exit(kind) => { println!("{}", kind.message().yellow()); }
+		}
 	}
 }
