@@ -10,7 +10,8 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use directories::ProjectDirs;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use jiff::{civil::DateTime, Span};
+use serde::{de::DeserializeOwned, Serialize};
 
 
 
@@ -111,9 +112,17 @@ impl DataTree
 	}
 }
 
+struct ScheduleItem
+{
+	todo: String,
+	start: DateTime,
+	end: DateTime
+}
+
 
 
 type Todos = HashMap<String, ()>;
+type Schedule = Vec<ScheduleItem>;
 
 
 
@@ -255,7 +264,8 @@ struct Selfish
 enum Commands
 {
 	Init,
-	Todo { #[command(subcommand)] command: TodoCommands }
+	Todo { #[command(subcommand)] command: TodoCommands },
+	Schedule { #[command(subcommand)] command: ScheduleCommands }
 }
 
 #[derive(Subcommand)]
@@ -263,6 +273,17 @@ enum TodoCommands
 {
 	Add { name: String },
 	List
+}
+
+#[derive(Subcommand)]
+enum ScheduleCommands
+{
+	Add
+	{
+		todo: String,
+		start: DateTime,
+		duration: Span
+	}
 }
 
 
@@ -275,7 +296,8 @@ fn run() -> Result<(), Error>
 	match selfish.command
 	{
 		Commands::Init => init(&data_tree),
-		Commands::Todo { command } => todo(&data_tree, command)
+		Commands::Todo { command } => todo(&data_tree, command),
+		Commands::Schedule { command } => todo!()
 	}
 }
 
