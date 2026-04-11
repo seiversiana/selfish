@@ -112,6 +112,10 @@ impl DataTree
 
 
 
+type Todos = HashMap<String, ()>;
+
+
+
 fn create_if_missing(path: &Path, content: &str) -> Result<(), Error>
 {
 	let mut file = match fs::OpenOptions::new()
@@ -208,18 +212,18 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 
 
 
-fn read_todo(tree: &DataTree) -> Result<HashMap<String, ()>, Error>
+fn read_todo(tree: &DataTree) -> Result<Todos, Error>
 {
 	let todo_path = tree.todo_path();
 
 	let data = fs::read_to_string(&todo_path)
 		.map_err(|_| Error::FileReadFail(todo_path.clone()))?;
 
-	Ok(serde_json::from_str::<HashMap<String, ()>>(&data)
+	Ok(serde_json::from_str(&data)
 		.map_err(|_| Error::DeserializeFail(todo_path))?)
 }
 
-fn write_todo(tree: &DataTree, todos: HashMap<String, ()>) -> Result<(), Error>
+fn write_todo(tree: &DataTree, todos: Todos) -> Result<(), Error>
 {
 	let todo_path = tree.todo_path();
 
