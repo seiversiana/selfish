@@ -11,7 +11,6 @@ use crate::outcome::{Outcome, FatalError};
 
 
 
-
 pub fn create_if_missing(path: &Path, content: &str) -> Result<(), Outcome>
 {
 	let mut file = match fs::OpenOptions::new()
