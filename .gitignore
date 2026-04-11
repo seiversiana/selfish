@@ -9,3 +9,10 @@
 
 !/src/
 !/src/main.rs
+!/src/cli.rs
+!/src/files.rs
+!/src/init.rs
+!/src/outcome.rs
+!/src/schedule.rs
+!/src/storage.rs
+!/src/todo.rs
