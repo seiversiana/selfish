@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use directories::ProjectDirs;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 
 
@@ -194,7 +195,7 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 			}
 
 			todos.insert(name, ());
-			write_todo(tree, todos)?;
+			write_todo(tree, &todos)?;
 			println!("{}", "Added todo item.".green());
 		}
 
@@ -212,28 +213,32 @@ fn todo(tree: &DataTree, command: TodoCommands) -> Result<(), Error>
 
 
 
-fn read_todo(tree: &DataTree) -> Result<Todos, Error>
+fn read_deserialize<T: DeserializeOwned>(path: &Path) -> Result<T, Error>
 {
-	let todo_path = tree.todo_path();
+	let data = fs::read_to_string(path)
+		.map_err(|_| Error::FileReadFail(path.to_path_buf()))?;
 
-	let data = fs::read_to_string(&todo_path)
-		.map_err(|_| Error::FileReadFail(todo_path.clone()))?;
-
-	Ok(serde_json::from_str(&data)
-		.map_err(|_| Error::DeserializeFail(todo_path))?)
+	serde_json::from_str(&data)
+		.map_err(|_| Error::DeserializeFail(path.to_path_buf()))
 }
 
-fn write_todo(tree: &DataTree, todos: Todos) -> Result<(), Error>
+fn write_serialize<T: Serialize>(path: &Path, data: &T) -> Result<(), Error>
 {
-	let todo_path = tree.todo_path();
+	let data = serde_json::to_string_pretty(data)
+		.map_err(|_| Error::SerializeFail(path.to_path_buf()))?;
 
-	let data = serde_json::to_string_pretty(&todos)
-		.map_err(|_| Error::SerializeFail(todo_path.clone()))?;
+	fs::write(&path, data)
+		.map_err(|_| Error::FileWriteFail(path.to_path_buf()))
+}
 
-	fs::write(&todo_path, data)
-		.map_err(|_| Error::FileWriteFail(todo_path))?;
+fn read_todo(tree: &DataTree) -> Result<Todos, Error>
+{
+	read_deserialize(&tree.todo_path())
+}
 
-	Ok(())
+fn write_todo(tree: &DataTree, todos: &Todos) -> Result<(), Error>
+{
+	write_serialize(&tree.todo_path(), todos)
 }
 
 
