@@ -12,3 +12,4 @@
 !/src/cli.rs
 !/src/init.rs
 !/src/outcome.rs
+!/src/print.rs
