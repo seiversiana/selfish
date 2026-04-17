@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 pub struct Selfish
 {
 	#[command(subcommand)]
-	command: Command
+	pub command: Command
 }
 
 #[derive(Subcommand)]
