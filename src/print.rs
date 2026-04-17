@@ -6,8 +6,32 @@
 macro_rules! color_println {
 	($color:ident, $($args:tt)*) => {{
 		use colored::Colorize;
-		println!("{}", format!($($args)*).$color())
+		println!("{}", format!($($args)*).$color());
 	}};
 }
 
-pub(crate) use color_println;
+macro_rules! fatal {
+	($($args:tt)*) => {{
+		crate::print::color_println!(red, $($args)*);
+	}}
+}
+
+macro_rules! warning {
+	($($args:tt)*) => {{
+		crate::print::color_println!(yellow, $($args)*);
+	}}
+}
+
+macro_rules! info {
+	($($args:tt)*) => {{
+		crate::print::color_println!(blue, $($args)*);
+	}}
+}
+
+macro_rules! success {
+	($($args:tt)*) => {{
+		crate::print::color_println!(green, $($args)*);
+	}}
+}
+
+pub(crate) use {color_println, fatal, warning, info, success};

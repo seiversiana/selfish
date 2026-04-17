@@ -11,7 +11,7 @@ use clap::Parser;
 use crate::cli::{Command, Selfish};
 use crate::init::init;
 use crate::outcome::Outcome;
-use crate::print::color_println;
+use crate::print::{fatal, warning};
 
 
 
@@ -19,8 +19,8 @@ fn main()
 {
 	match run()
 	{
-		Err(Outcome::Exit(exit))   => color_println!(yellow, "{}", exit),
-		Err(Outcome::Fatal(fatal)) => color_println!(red, "{}", fatal),
+		Err(Outcome::Exit(exit))   => warning!("{}", exit),
+		Err(Outcome::Fatal(fatal)) => fatal!("{}", fatal),
 		_ => ()
 	}
 }
