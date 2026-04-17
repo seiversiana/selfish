@@ -15,15 +15,20 @@ use crate::outcome::Outcome;
 
 fn main()
 {
-	let selfish = Selfish::parse();
-
-	match match &selfish.command
-		{
-			Command::Init => init()
-		}
+	match run()
 	{
 		Err(Outcome::Exit(exit))   => println!("{}", exit),
 		Err(Outcome::Fatal(fatal)) => println!("{}", fatal),
 		_ => ()
+	}
+}
+
+fn run() -> Result<(), Outcome>
+{
+	let selfish = Selfish::parse();
+
+	match &selfish.command
+	{
+		Command::Init => init()
 	}
 }
