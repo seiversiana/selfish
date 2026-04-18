@@ -6,6 +6,7 @@ use std::fs::create_dir_all;
 use directories::ProjectDirs;
 
 use crate::outcome::{Exit, Fatal, Outcome};
+use crate::print::success;
 
 
 
@@ -22,6 +23,6 @@ pub fn init() -> Result<(), Outcome>
 
 	create_dir_all(root).map_err(|_| Fatal::DirCreateFail(root.to_path_buf()))?;
 
-	println!("Successfully initialized selfish.");
+	success!("Successfully initialized selfish.");
 	Ok(())
 }
