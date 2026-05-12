@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (C) Nile Jocson <seiversiana@gmail.com>
 // SPDX-License-Identifier: MPL-2.0
 
-mod cli;
-
 use clap::Parser;
+
+mod cli;
+mod outcome;
 
 use cli::{Cli, Commands};
 
